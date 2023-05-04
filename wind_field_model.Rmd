@@ -6,7 +6,7 @@ editor_options:
 ---
 
 
-## Western Pacific typhoons
+## IBTraCS data
 
 ```{r}
 L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.WP.list.v04r00.lines.zip"
