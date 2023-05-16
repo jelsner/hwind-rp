@@ -20,99 +20,94 @@ unzip(here::here("data", "IBTrACS.WP.list.v04r00.lines.zip"),
 }
 ```
 
-## 
-
-```{r}
-#| echo: true
-#| output-location: slide
-sf::st_read(dsn = here::here("data"), 
-            layer = "IBTrACS.WP.list.v04r00.lines") |>
-  sf::st_drop_geometry() |>
-  dplyr::filter(year >= 1970, USA_WIND >= 64) |>
-  dplyr::select(year, USA_WIND, NAME, LAT, LON) |>
-  dplyr::group_by(year, NAME) |>
-  dplyr::summarize(Wmax = max(USA_WIND),
-                   LATmax = max(LAT[USA_WIND == Wmax]),
-                   LONmax = max(LON[USA_WIND == Wmax])) |>
-  dplyr::group_by(year) |>
-  dplyr::summarize(AvgLATmax = mean(LATmax),
-                   AvgLONmax = mean(LONmax)) |>
-ggplot(mapping = aes(x = year, y = AvgLATmax)) +
-  geom_point() +
-  geom_smooth(method = lm)
-```
-
 ## Wind field model
 
 <https://github.com/jbcannon/hurrecon/tree/v.0.0.1>
 
 ```{r}
-#| echo: true
 install.packages('devtools')
 devtools::install_github('jbcannon/hurrecon')
 
 library(hurrecon)
 path <- here::here("data", "hurdat_data.csv")
 fetch_best_tracks_data(path,
-                       src = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2021-100522.txt")
+                       src = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2022-040723.txt")
 ```
 
-The last 6 numbers before the `.txt` are the date of the archive
+The last 6 numbers before the `.txt` are the date of the archive. As of 16 May 2023, the archive date is 7 April 2023
 
-## 
-
--   Load the data for Hurricane Michael (2018, ID = AL142018) as a simple feature data frame with CRS UTM16 (EPSG 32616)
-
+Load the data for Hurricane Michael (2018, ID = AL142018) as a simple feature data frame with CRS UTM16 (EPSG 32616)
 ```{r}
-#| echo: true
 Michael_Track.sf <- load_hurdat_track(path, 
                                       trackID = 'AL142018')
 ```
 
--   Get land mask
-
+Get land mask
 ```{r}
-#| echo: true
 library(terra)
 data("geographic")
 ```
 
-## 
-
--   Create raster of winds. This takes a long time
-
-```{r, eval=FALSE}
-#| echo: true
+Create raster of winds with units of m/s. This takes a long time (13 minutes on desktop)
+```{r}
+t0 <- Sys.time()
 Wind.r <- hurrecon_run(Michael_Track.sf, 
-                       max_rad_km = 100, res_m = 30000, max_interp_dist_km = 5)
+                       max_rad_km = 100, 
+                       res_m = 30000, 
+                       max_interp_dist_km = 5)
+Sys.time() - t0
+```
+
+Make a plot
+```{r}
 plot(land)
 plot(Wind.r, add = TRUE)
 plot(land, add = TRUE)
 ```
 
-##  {.smaller}
+Extract the wind speed from the raster at a particular location.
 
--   Include only track observations when the track is within 500 km of a location
-
+Create the location
 ```{r}
-Leon.sf <- USAboundaries::us_counties(states = "FL") |>
-  dplyr::select(name) |>
-  dplyr::filter(name == "Leon") |>
-  sf::st_transform(crs = sf::st_crs(Michael_Track.sf)) |>
-  sf::st_centroid() |>
-  sf::st_buffer(dist = 500000)
+point <- sf::st_point(c(-85.3, 29.9))
+location.sf <- sf::st_sfc(point, 
+                           crs = 4326) |>
+  sf::st_transform(crs = sf::st_crs(Wind.r)) |>
+  sf::st_as_sf()
+
+Wind.r |>
+  terra::extract(location.sf)
+```
+
+
+Include only track observations when the track is within 200 km of a location
+```{r}
+buffer.sf <- location.sf |>
+  sf::st_buffer(dist = 200000)
 
 Michael_Track2.sf <- Michael_Track.sf |>
-  sf::st_intersection(Leon.sf) 
+  sf::st_intersection(buffer.sf) 
 
 colnames(Michael_Track2.sf)[11:22] <- colnames(Michael_Track.sf)[11:22]
+```
 
+Run the wind field model
+```{r}
+t0 <- Sys.time()
 Wind.r2 <- hurrecon_run(Michael_Track2.sf, 
                         max_rad_km = 100, res_m = 5000, max_interp_dist_km = 5)
+Sys.time() - t0
+```
 
+32 seconds
+
+```{r}
 tmap::tmap_mode("view")
 tmap::tm_shape(Wind.r2) +
   tmap::tm_raster(alpha = .5) +
   tmap::tm_shape(Michael_Track.sf) +
     tmap::tm_dots()
 ```
+
+Multiple storms wind fields for a specific location into a single `SpatVector`.
+
