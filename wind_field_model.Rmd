@@ -8,16 +8,61 @@ editor_options:
 
 ## IBTraCS data
 
+https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/
+
 ```{r}
-L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.WP.list.v04r00.lines.zip"
+L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.NA.list.v04r00.lines.zip"
   
-if(!"IBTrACS.WP.list.v04r00.lines.zip" %in% list.files(here::here("data"))) {
+if(!"IBTrACS.NA.list.v04r00.lines.zip" %in% list.files(here::here("data"))) {
 download.file(url = L,
               destfile = here::here("data",
-                                    "IBTrACS.WP.list.v04r00.lines.zip"))
-unzip(here::here("data", "IBTrACS.WP.list.v04r00.lines.zip"),
+                                    "IBTrACS.NA.list.v04r00.lines.zip"))
+unzip(here::here("data", "IBTrACS.NA.list.v04r00.lines.zip"),
       exdir = here::here("data"))
 }
+
+Tracks.sf <- sf::st_read(dsn = here::here("data"), 
+                         layer = "IBTrACS.NA.list.v04r00.lines") |>
+  sf::st_transform(crs = 32616)
+```
+
+Find all storms that are within 100 km of a location
+```{r}
+point <- sf::st_point(c(-85.3, 29.9))
+location.sf <- sf::st_sfc(point, 
+                           crs = 4326) |>
+  sf::st_transform(crs = 32616) |>
+  sf::st_as_sf()
+
+buffer.sf <- location.sf |>
+  sf::st_buffer(dist = 100000)
+
+Tracks2.sf <- Tracks.sf |>
+  sf::st_intersection(buffer.sf)
+
+Tracks3.sf <- Tracks2.sf[!is.na(Tracks2.sf$USA_ATCFID),]
+
+length(unique(Tracks3.sf$USA_ATCFID))
+max(Tracks3.sf$SEASON) - min(Tracks3.sf$SEASON) + 1
+```
+
+List the unique storms by `USA_ATCFID` = `track_id`
+```{r}
+unique(Tracks3.sf$USA_ATCFID)
+```
+
+Group by storm ID and find the fastest wind
+```{r}
+X <- Tracks3.sf |>
+  sf::st_drop_geometry() |>
+  dplyr::group_by(USA_ATCFID) |>
+  dplyr::summarize(Wmax = max(WMO_WIND, na.rm = TRUE))
+```
+
+```{r}
+tmap::tmap_mode("view")
+tmap::tm_shape(Tracks2.sf) +
+  tmap::tm_lines()
 ```
 
 ## Wind field model
@@ -40,6 +85,8 @@ Load the data for Hurricane Michael (2018, ID = AL142018) as a simple feature da
 ```{r}
 Michael_Track.sf <- load_hurdat_track(path, 
                                       trackID = 'AL142018')
+X.sf <- load_hurdat_track(path,
+                          trackID = 'AL041851')
 ```
 
 Get land mask
@@ -111,3 +158,27 @@ tmap::tm_shape(Wind.r2) +
 
 Multiple storms wind fields for a specific location into a single `SpatVector`.
 
+Get all tracks
+```{r}
+df <- read.csv(here::here("data", "hurdat_data.csv"))
+df$date <- lubridate::ymd(df$date)
+df$lon2 <- as.numeric(df$lon)
+df$lat2 <- as.numeric(df$lat)
+df <- df[complete.cases(df[, c("lon2")]), ]
+
+sdf <- df |>
+  sf::st_as_sf(coords = c("lon2", "lat2"))
+sf::st_crs(sdf) <- 4326
+
+sdf <- sdf |>
+  sf::st_transform(crs = 32616)
+
+sdf[, c("utmx", "utmy")] <- sf::st_coordinates(sdf)
+
+cn <- c("34kt_ne", "34kt_se",	"34kt_sw", "34kt_nw",	
+        "50kt_ne", "50kt_se",	"50kt_sw", "50kt_nw",
+        "64kt_ne", "64kt_se",	"64kt_sw", "64kt_nw")
+colnames(sdf)[11:22] <- cn
+```
+
+Find all storms that have passed with 
