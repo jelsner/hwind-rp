@@ -9,7 +9,9 @@ editor_options:
 ## IBTraCS data
 
 https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/
+https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/doc/IBTrACS_v04_Technical_Details.pdf
 
+Wind speed in knots
 ```{r}
 L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.NA.list.v04r00.lines.zip"
   
