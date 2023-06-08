@@ -6,7 +6,9 @@ editor_options:
 ---
 
 
-## IBTraCS data with geometry type LINESTRING
+## IBTraCS data 
+
+Geometry type LINESTRING
 
 https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/
 https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/doc/IBTrACS_v04_Technical_Details.pdf
@@ -28,7 +30,7 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
   sf::st_transform(crs = 32616)
 ```
 
-Find all storms that are within 100 km of a location
+Find all storms within 100 km of a location
 ```{r}
 point <- sf::st_point(c(-85.3, 29.9))
 location.sf <- sf::st_sfc(point, 
@@ -92,7 +94,7 @@ X |>
   dplyr::arrange(desc(nTC))
 ```
 
-Repeat for cities areas
+Repeat for city areas
 
 ```{r}
 library(tidycensus)
