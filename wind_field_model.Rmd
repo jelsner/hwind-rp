@@ -60,10 +60,16 @@ X |>
 ```{r}
 library(tidycensus)
 
-#Boundaries2.sf <- get_acs(geography = "zcta",
-#                          variables = "B01003_001",
-#                          geometry = TRUE) |>
-#  sf::st_transform(crs = 32616)
+Boundaries2.sf <- get_decennial(geography = "zcta",
+                                variables = "B03002_001",
+                                year = 2019,
+                                geometry = TRUE) |>
+  sf::st_transform(crs = 32616)
+
+Boundaries2.sf <- get_acs(geography = "zip code tabulation area", 
+                          variables = "B19013_001",
+                          summary_var = "B01001_001", 
+                          geometry = TRUE)
 
 
 Boundaries2.sf <- get_acs(geography = "place",
@@ -71,6 +77,7 @@ Boundaries2.sf <- get_acs(geography = "place",
                       state = "FL",
                       geometry = TRUE) |>
     sf::st_transform(crs = 32616)
+
 
 X <- Tracks.sf |>
   dplyr::filter(year >= 1980) |>
