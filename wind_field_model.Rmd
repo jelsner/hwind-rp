@@ -32,6 +32,8 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
 
 ## Extract the dates of county-level TC center crossings 1980-2022
 
+https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
+
 ```{r}
 Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
   sf::st_transform(crs = 32616)
@@ -74,7 +76,7 @@ Boundaries2.sf <- get_acs(geography = "zip code tabulation area",
 
 Boundaries2.sf <- get_acs(geography = "place",
                       variables = "B01003_001",
-                      state = "FL",
+                      state = c("FL", "AL", "MS", "LA", "TX"),
                       geometry = TRUE) |>
     sf::st_transform(crs = 32616)
 
@@ -83,12 +85,15 @@ X <- Tracks.sf |>
   dplyr::filter(year >= 1980) |>
   sf::st_intersection(y = Boundaries2.sf) |>
   dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
-  dplyr::mutate(date = lubridate::as_date(ISO_TIME)) |>
+  dplyr::mutate(date = lubridate::as_date(ISO_TIME),
+                StormNameYear = paste0(NAME, "-", lubridate::year(date))) |>
   sf::st_drop_geometry() |>
-  dplyr::group_by(GEOID, date) |>
+  dplyr::group_by(date, GEOID) |>
   dplyr::summarize(CityName = dplyr::first(NAME.1),
                    Wind_kt = max(USA_WIND),
-                   Press_mb = min(USA_PRES))
+                   Press_mb = min(USA_PRES),
+                   StormNameYear = dplyr::first(StormNameYear)) |>
+  dplyr::arrange(date, desc(Wind_kt))
 ```
 
 
@@ -115,7 +120,7 @@ X <- Tracks.sf |>
                    StormNameYear = dplyr::first(StormNameYear)) |>
   dplyr::arrange(date, GEOID)
 
-write.csv(X, here::here("data", "tract-level-winds"))
+write.csv(X, here::here("data", "place-level-TC-winds-pressure"))
 ```
 
 What storm impacted the most areas?
