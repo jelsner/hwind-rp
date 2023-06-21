@@ -70,7 +70,7 @@ Boundaries2.sf <- get_decennial(geography = "zcta",
 
 Boundaries2.sf <- get_acs(geography = "zip code tabulation area", 
                           variables = "B19013_001",
-                          summary_var = "B01001_001", 
+                          summary_var = "B01001_001",
                           geometry = TRUE)
 
 
