@@ -72,22 +72,30 @@ tmap::tm_shape(Tracks2.sf) +
 ## Extract the dates of county-level TC center crossings 1980-2022
 
 ```{r}
-Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
-  sf::st_transform(crs = 32616)
+#Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
+#  sf::st_transform(crs = 32616)
+
+library(tidycensus)
+
+Boundaries.sf <- get_acs(geography = "county",
+                      variables = "B01003_001",
+                      state = "FL",
+                      geometry = TRUE) |>
+    sf::st_transform(crs = 32616)
 
 X <- Tracks.sf |>
   dplyr::filter(year >= 1980) |>
   sf::st_intersection(y = Boundaries.sf) |>
-  dplyr::select(geoid, name, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
+#  dplyr::select(GEOID, ISO_TIME, USA_WIND, USA_PRES) |>
   dplyr::mutate(date = lubridate::as_date(ISO_TIME)) |>
   sf::st_drop_geometry() |>
-  dplyr::group_by(geoid, date) |>
-  dplyr::summarize(CountyName = dplyr::first(name),
+  dplyr::group_by(GEOID, date) |>
+  dplyr::summarize(StormName = dplyr::first(NAME),
                    Wind_kt = max(USA_WIND),
                    Press_mb = min(USA_PRES))
 
 X |>
-  dplyr::group_by(CountyName) |>
+  dplyr::group_by(GEOID) |>
   dplyr::summarize(nTC = dplyr::n(),
                    Wmax = max(Wind_kt, na.rm = TRUE),
                    Pmin = min(Press_mb, na.rm = TRUE)) |>
@@ -97,14 +105,6 @@ X |>
 Repeat for city areas
 
 ```{r}
-library(tidycensus)
-
-#Boundaries2.sf <- get_acs(geography = "zcta",
-#                          variables = "B01003_001",
-#                          geometry = TRUE) |>
-#  sf::st_transform(crs = 32616)
-
-
 Boundaries2.sf <- get_acs(geography = "place",
                       variables = "B01003_001",
                       state = "FL",
