@@ -64,6 +64,92 @@ X |>
   dplyr::arrange(desc(nTC))
 ```
 
+## Repeat for census tracts
+
+```{r}
+Boundaries.sf <- tidycensus::get_acs(
+  geography = "tract",
+  variables = "B01003_001",
+  state = "FL",
+  geometry = TRUE
+  ) |>
+    sf::st_transform(crs = 32616)
+
+X <- Tracks.sf |>
+  dplyr::filter(year >= 1980) |>
+  sf::st_intersection(y = Boundaries.sf) |>
+  dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
+  dplyr::mutate(date = lubridate::as_date(ISO_TIME),
+                StormNameYear = paste0(NAME, "-", lubridate::year(date))) |>
+  sf::st_drop_geometry() |>
+  dplyr::group_by(GEOID, date) |>
+  dplyr::summarize(AreaName = dplyr::first(NAME.1),
+                   Wind_kt = max(USA_WIND),
+                   Press_mb = min(USA_PRES),
+                   StormNameYear = dplyr::first(StormNameYear)) |>
+  dplyr::arrange(date, GEOID) |>
+  dplyr::left_join(Boundaries.sf, by = "GEOID", keep = FALSE) |>
+  sf::st_as_sf()
+
+#write.csv(X, here::here("data", "place-level-TC-winds-pressure"))
+```
+
+What storm impacted the most areas?
+```{r}
+X |> 
+  dplyr::group_by(StormNameYear) |>
+  dplyr::summarize(nAreasImpacted = dplyr::n()) |>
+  dplyr::arrange(desc(nAreasImpacted))
+```
+
+
+## Get PRISM rainfall data for Hurricane Kate (1985)
+
+```{r}
+library(prism)
+
+prism_set_dl_dir("data/PRISM")
+
+get_prism_dailys(type = "ppt",
+                 minDate = "1985-11-21",
+                 maxDate = "1985-11-22")
+
+dates <- seq(lubridate::as_date("1985-11-21"), 
+             lubridate::as_date("1985-11-22"), 
+             by = "day")
+
+file_days <- gsub("-", "", dates)
+
+folder_names <- paste0("PRISM_ppt_stable_4kmD2_", file_days, "_bil/")
+file_names <- paste0("PRISM_ppt_stable_4kmD2_", file_days, "_bil.bil")
+file_list <- paste0("data/", "PRISM/", folder_names, file_names)
+
+ppt.st <- stars::read_stars(file_list, along = list(time = dates)) |>
+  setNames("Precip_mm")
+
+plot(ppt.st)
+```
+
+Crop prism rasters to census tracts affected by Kate
+
+```{r}
+
+X2 <- X |>
+  dplyr::filter(StormNameYear == "KATE-1985") |>
+  sf::st_transform(crs = sf::st_crs(ppt.st))
+
+plot(X2$geometry)
+
+ppt2.st <- ppt.st |>
+  sf::st_crop(X2)
+
+plot(ppt2.st)
+
+```
+
+
+
+
 ## Repeat for city areas
 
 ```{r}
@@ -101,41 +187,6 @@ X <- Tracks.sf |>
                    Press_mb = min(USA_PRES),
                    StormNameYear = dplyr::first(StormNameYear)) |>
   dplyr::arrange(date, desc(Wind_kt))
-```
-
-
-## Repeat for census tracts
-
-```{r}
-Boundaries3.sf <- get_acs(geography = "tract",
-                      variables = "B01003_001",
-                      state = "FL",
-                      geometry = TRUE) |>
-    sf::st_transform(crs = 32616)
-
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
-  sf::st_intersection(y = Boundaries3.sf) |>
-  dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
-  dplyr::mutate(date = lubridate::as_date(ISO_TIME),
-                StormNameYear = paste0(NAME, "-", lubridate::year(date))) |>
-  sf::st_drop_geometry() |>
-  dplyr::group_by(GEOID, date) |>
-  dplyr::summarize(AreaName = dplyr::first(NAME.1),
-                   Wind_kt = max(USA_WIND),
-                   Press_mb = min(USA_PRES),
-                   StormNameYear = dplyr::first(StormNameYear)) |>
-  dplyr::arrange(date, GEOID)
-
-write.csv(X, here::here("data", "place-level-TC-winds-pressure"))
-```
-
-What storm impacted the most areas?
-```{r}
-X |> 
-  dplyr::group_by(StormNameYear) |>
-  dplyr::summarize(nAreasImpacted = dplyr::n()) |>
-  dplyr::arrange(desc(nAreasImpacted))
 ```
 
 
@@ -294,5 +345,3 @@ cn <- c("34kt_ne", "34kt_se",	"34kt_sw", "34kt_nw",
         "64kt_ne", "64kt_se",	"64kt_sw", "64kt_nw")
 colnames(sdf)[11:22] <- cn
 ```
-
-Find all storms that have passed with 
