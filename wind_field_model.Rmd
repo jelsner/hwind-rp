@@ -71,7 +71,7 @@ library(tidycensus)
 
 Boundaries2.sf <- get_decennial(geography = "zcta",
                                 variables = "B03002_001",
-                                year = 2019,
+                                year = 2010,
                                 geometry = TRUE) |>
   sf::st_transform(crs = 32616)
 
