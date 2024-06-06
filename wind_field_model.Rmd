@@ -145,6 +145,9 @@ ppt2.st <- ppt.st |>
 
 plot(ppt2.st)
 
+#must make ppt.st a raster of some type
+
+exactextractr::exact_extract(ppt.st, X2, fun = max)
 ```
 
 
