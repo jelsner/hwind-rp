@@ -34,6 +34,13 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
 
 https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
 
+`USABboundaries` package no longer maintained on CRAN
+
+```{r}
+devtools::install_github("ropensci/USAboundariesData")
+devtools::install_github("ropensci/USAboundaries")
+```
+
 ```{r}
 Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
   sf::st_transform(crs = 32616)
@@ -172,77 +179,21 @@ tmap::tm_shape(Tracks2.sf) +
   tmap::tm_lines()
 ```
 
-<<<<<<< HEAD
-## Extract the dates of county-level TC center crossings 1980-2022
-
-```{r}
-#Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
-#  sf::st_transform(crs = 32616)
-
-library(tidycensus)
-
-Boundaries.sf <- get_acs(geography = "county",
-                      variables = "B01003_001",
-                      state = "FL",
-                      geometry = TRUE) |>
-    sf::st_transform(crs = 32616)
-
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
-  sf::st_intersection(y = Boundaries.sf) |>
-#  dplyr::select(GEOID, ISO_TIME, USA_WIND, USA_PRES) |>
-  dplyr::mutate(date = lubridate::as_date(ISO_TIME)) |>
-  sf::st_drop_geometry() |>
-  dplyr::group_by(GEOID, date) |>
-  dplyr::summarize(StormName = dplyr::first(NAME),
-                   Wind_kt = max(USA_WIND),
-                   Press_mb = min(USA_PRES))
-
-X |>
-  dplyr::group_by(GEOID) |>
-  dplyr::summarize(nTC = dplyr::n(),
-                   Wmax = max(Wind_kt, na.rm = TRUE),
-                   Pmin = min(Press_mb, na.rm = TRUE)) |>
-  dplyr::arrange(desc(nTC))
-```
-
-Repeat for city areas
-
-```{r}
-Boundaries2.sf <- get_acs(geography = "place",
-                      variables = "B01003_001",
-                      state = "FL",
-                      geometry = TRUE) |>
-    sf::st_transform(crs = 32616)
-
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
-  sf::st_intersection(y = Boundaries2.sf) |>
-  dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
-  dplyr::mutate(date = lubridate::as_date(ISO_TIME)) |>
-  sf::st_drop_geometry() |>
-  dplyr::group_by(GEOID, date) |>
-  dplyr::summarize(CityName = dplyr::first(NAME.1),
-                   Wind_kt = max(USA_WIND),
-                   Press_mb = min(USA_PRES))
-```
-
-
 ## Wind field model
 
 <https://github.com/jbcannon/hurrecon/tree/v.0.0.1>
 
 ```{r}
-install.packages('devtools')
 devtools::install_github('jbcannon/hurrecon')
 
 library(hurrecon)
 path <- here::here("data", "hurdat_data.csv")
 fetch_best_tracks_data(path,
-                       src = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2022-040723.txt")
+                       src = 
+"https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2023-051124.txt")
 ```
 
-The last 6 numbers before the `.txt` are the date of the archive. As of 16 May 2023, the archive date is 7 April 2023
+The last 6 numbers before the `.txt` are the date of the archive. As of 6 June 2024, the archive date is 5 May 2023
 
 Load the data for Hurricane Michael (2018, ID = AL142018) as a simple feature data frame with CRS UTM16 (EPSG 32616)
 ```{r}
