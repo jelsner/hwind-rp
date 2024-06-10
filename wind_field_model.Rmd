@@ -13,6 +13,8 @@ Geometry type LINESTRING
 https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/
 https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/doc/IBTrACS_v04_Technical_Details.pdf
 
+https://www.ncei.noaa.gov/sites/default/files/2021-07/IBTrACS_v04_column_documentation.pdf
+
 Wind speed in knots
 ```{r}
 L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.NA.list.v04r00.lines.zip"
@@ -29,6 +31,68 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
                          layer = "IBTrACS.NA.list.v04r00.lines") |>
   sf::st_transform(crs = 32616)
 ```
+
+Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
+```{r}
+Tracks.sf |>
+  sf::st_drop_geometry() |>
+  dplyr::filter(year >= 1980 & year <= 2023) |>
+  dplyr::summarize(avgRMW = mean(USA_RMW, na.rm = TRUE) * 1.852,
+                   avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
+```
+
+Keep only hurricanes since 1980
+```{r}
+Tracks2.sf <- Tracks.sf |>
+  dplyr::filter(year >= 1980) |>
+  dplyr::filter(USA_WIND >= 64) |>
+  dplyr::select(SID, SEASON, year, month, day, hour, min,
+                NAME, SUBBASIN, ISO_TIME,
+                USA_WIND, USA_PRES, USA_RMW, USA_EYE, USA_ROCI)
+```
+
+Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
+```{r}
+Tracks2.sf |>
+  sf::st_drop_geometry() |>
+  dplyr::filter(year >= 1980 & year <= 2023) |>
+#  dplyr::group_by(USA_PRES) |>
+  dplyr::summarize(avgRMW = mean(USA_RMW, na.rm = TRUE) * 1.852,
+                   avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
+```
+
+Fill in missing RMW values. Start with pedigree, then use minimum pressure, and finish again with pedigree
+```{r}
+Tracks2.sf <- Tracks2.sf |>
+  dplyr::group_by(SID) |>
+  dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
+
+Tracks2.sf <- Tracks2.sf |>
+  dplyr::group_by(USA_PRES) |>
+  dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
+
+Tracks2.sf <- Tracks2.sf |>
+  dplyr::group_by(SID) |>
+  dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
+```
+
+Add a buffer to the tracks to make segmented swaths
+
+```{r}
+Swaths.sf <- Tracks2.sf |>
+  sf::st_buffer(dist = Tracks2.sf$USA_RMW * 1852)
+
+library(tmap)
+
+tmap::tmap_mode("view")
+
+tmap::tm_shape(Swaths.sf) +
+  tmap::tm_borders()
+
+```
+
+
+
 
 ## Extract the dates of county-level TC center crossings 1980-2022
 
@@ -100,6 +164,45 @@ X |>
   dplyr::group_by(StormNameYear) |>
   dplyr::summarize(nAreasImpacted = dplyr::n()) |>
   dplyr::arrange(desc(nAreasImpacted))
+```
+
+## Repeat for city areas (zip code tabulation area, ztca)
+
+```{r}
+library(tidycensus)
+
+# valid years are 2000, 2010, and 2020
+Boundaries.sf <- get_decennial(
+  geography = "zcta",
+  variables = "P005003",
+  year = 2010,
+  state = "FL",  # one state at a time
+  geometry = TRUE
+  ) |>
+  sf::st_transform(crs = 32616)
+
+Boundaries.sf <- get_acs(
+  geography = "place",  # cities/metro areas
+  variables = "B01003_001",
+  year = 2020, #years 2014-2018
+  state = c("FL"),
+  geometry = TRUE) |>
+  sf::st_transform(crs = 32616)
+
+
+X <- Tracks.sf |>
+  dplyr::filter(year >= 1980) |>
+  sf::st_intersection(y = Boundaries2.sf) |>
+  dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
+  dplyr::mutate(date = lubridate::as_date(ISO_TIME),
+                StormNameYear = paste0(NAME, "-", lubridate::year(date))) |>
+  sf::st_drop_geometry() |>
+  dplyr::group_by(date, GEOID) |>
+  dplyr::summarize(CityName = dplyr::first(NAME.1),
+                   Wind_kt = max(USA_WIND),
+                   Press_mb = min(USA_PRES),
+                   StormNameYear = dplyr::first(StormNameYear)) |>
+  dplyr::arrange(date, desc(Wind_kt))
 ```
 
 
