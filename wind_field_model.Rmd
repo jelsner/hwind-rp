@@ -98,7 +98,7 @@ tmap::tm_shape(Swaths.sf) +
 
 https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
 
-`USABboundaries` package no longer maintained on CRAN
+`USAboundaries` package no longer maintained on CRAN
 
 ```{r}
 devtools::install_github("ropensci/USAboundariesData")
@@ -231,6 +231,21 @@ ppt.st <- stars::read_stars(file_list, along = list(time = dates)) |>
   setNames("Precip_mm")
 
 plot(ppt.st)
+```
+
+Extract rainfall from space-time `stars` object at a particular target location (e.g., centroid of zip code area).
+```{r}
+print(ppt.st)
+
+library(sf)
+st_crs(ppt.st)
+
+target_location <- st_sfc(st_point(c(-84.28, 30.43)), crs = 4326) 
+target_location_transformed <- st_transform(target_location, 
+                                            st_crs(ppt.st))
+
+time_series_data <- stars::st_extract(ppt.st, target_location_transformed)
+time_series_data$Precip_mm
 ```
 
 Crop prism rasters to census tracts affected by Kate
