@@ -27,8 +27,15 @@ nc_data <- nc_open("data/TEMPO_RADT_L1_V03_20230927T100339Z_S001G01.nc")
 # Print the level 1 file structure
 str(nc_data, max.level = 1)
 str(nc_data$var, max.level = 1)
-nc_data$var$"band_290_490_nm/terrain_height_stddev"
+str(nc_data$var$"band_290_490_nm/terrain_height_stddev", max.level = 1)
+str(nc_data$var$"band_290_490_nm/radiance", max.level = 2)
+
+str(nc_data$dim, max.level = 1)
 ```
 
+From what I can tell this data is meta. The actual radiances, etc might be in some other file?
+
 https://asdc.larc.nasa.gov/documents/tempo/guide/TEMPO_Level-1_user_guide_V1.1.pdf
+
+
 
