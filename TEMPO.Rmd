@@ -1,0 +1,34 @@
+---
+title: "TEMPO (Tropospheric Emissions: Monitoring of Pollution) data"
+output: html_document
+date: "2024-09-21"
+editor_options: 
+  chunk_output_type: console
+---
+
+Launched on 7 April 2023 as a payload onboard the commercial Intelsat 40e (IS40e) communications satellite, Tropospheric Emissions: Monitoring of Pollutants (TEMPO), is a spaceborne instrument mission, owned and operated by NASA (National Aeronautics and Space Administration). TEMPO aims to monitor major air pollutants over the North American continent from a geostationary satellite.
+
+The Tropospheric Emissions: Monitoring of Pollution (TEMPO) instrument is a grating spectrometer, sensitive to visible (VIS) and ultraviolet (UV) wavelengths of light with a spectral range of 290-490 + 540-740 nm and 0.6 nm spectral resolution. The TEMPO instrument is attached to the Earth-facing side of a commercial telecommunications satellite (Intelsat 40e) in geostationary orbit over 91˚ W longitude (about 22,000 miles above Earth’s equator). This allows TEMPO to maintain a continuous view of North America so that the instrument's light-collecting mirror can make a complete east-to-west scan of the field of regard hourly during daylight hours. By measuring sunlight reflected and scattered from the Earth's surface and atmosphere back to the instrument's detectors, TEMPO's ultraviolet and visible light sensors provide measurements of ozone, nitrogen dioxide, formaldehyde, and other constituents involved in the chemical dynamics of Earth’s atmosphere.
+
+Read and view the NetCDF file using `stars` package. DID NOT WORK
+```{r}
+library(stars)
+
+data.stars <- read_stars("data/TEMPO_RADT_L1_V03_20230927T100339Z_S001G01.nc")
+```
+
+Try with the `ncdf4` package. It provides lower-level access to NetCDF data, which can be useful for complex operations.
+```{r}
+library(ncdf4)
+
+# Open the NetCDF file
+nc_data <- nc_open("data/TEMPO_RADT_L1_V03_20230927T100339Z_S001G01.nc")
+
+# Print the level 1 file structure
+str(nc_data, max.level = 1)
+str(nc_data$var, max.level = 1)
+nc_data$var$"band_290_490_nm/terrain_height_stddev"
+```
+
+https://asdc.larc.nasa.gov/documents/tempo/guide/TEMPO_Level-1_user_guide_V1.1.pdf
+
