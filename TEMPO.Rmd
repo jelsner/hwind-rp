@@ -37,5 +37,7 @@ From what I can tell this data is meta. The actual radiances, etc might be in so
 
 https://asdc.larc.nasa.gov/documents/tempo/guide/TEMPO_Level-1_user_guide_V1.1.pdf
 
+Getting the data, https://www.youtube.com/watch?v=meySKqVuVT0 about 28 minutes in Daniel Kaufman
+
 
 
