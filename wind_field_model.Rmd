@@ -51,28 +51,30 @@ Tracks2.sf <- Tracks.sf |>
                 USA_WIND, USA_PRES, USA_RMW, USA_EYE, USA_ROCI)
 ```
 
-Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
+Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. ROCI: Radius of outer closed isobar. To convert to kilometers multiply by 1.852.
 ```{r}
 Tracks2.sf |>
   sf::st_drop_geometry() |>
   dplyr::filter(year >= 1980 & year <= 2023) |>
 #  dplyr::group_by(USA_PRES) |>
   dplyr::summarize(avgRMW = mean(USA_RMW, na.rm = TRUE) * 1.852,
-                   avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
+                   avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852,
+                   avgROCI = mean(USA_ROCI, na.rm = TRUE) * 1.852)
 ```
 
 Fill in missing RMW values. Start with pedigree, then use minimum pressure, and finish again with pedigree
+
 ```{r}
 Tracks2.sf <- Tracks2.sf |>
-  dplyr::group_by(SID) |>
+  dplyr::group_by(SID) |>  # pedigree
   dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
 
 Tracks2.sf <- Tracks2.sf |>
-  dplyr::group_by(USA_PRES) |>
+  dplyr::group_by(USA_PRES) |> # minimum pressure
   dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
 
 Tracks2.sf <- Tracks2.sf |>
-  dplyr::group_by(SID) |>
+  dplyr::group_by(SID) |> # pedigree
   dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
 ```
 
@@ -80,7 +82,11 @@ Add a buffer to the tracks to make segmented swaths
 
 ```{r}
 Swaths.sf <- Tracks2.sf |>
-  sf::st_buffer(dist = Tracks2.sf$USA_RMW * 1852)
+  sf::st_buffer(dist = Tracks2.sf$USA_RMW * 1852) # 1852 converts to meters
+
+SingleSwaths.sf <- Swaths.sf |>
+  dplyr::group_by(SID) |>
+  sf::st_combine()
 
 library(tmap)
 
@@ -92,9 +98,7 @@ tmap::tm_shape(Swaths.sf) +
 ```
 
 
-
-
-## Extract the dates of county-level TC center crossings 1980-2022
+## Extract the dates of county-level TC center crossings 1980-2023
 
 https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
 
@@ -105,12 +109,67 @@ devtools::install_github("ropensci/USAboundariesData")
 devtools::install_github("ropensci/USAboundaries")
 ```
 
+Keep only swaths that intersect the boundary of Florida
+
+```{r}
+Boundaries.sf <- USAboundaries::us_states(resolution = "low", states = "FL") |> 
+  sf::st_transform(crs = 32616)
+
+X <- Swaths.sf |>
+  sf::st_intersects(Boundaries.sf, sparse = FALSE)
+
+Swaths.sf <- Swaths.sf[X, ]
+
+Swaths.sf <- Swaths.sf |>
+  dplyr::mutate(Date = lubridate::as_date(ISO_TIME)) # add a m-y-d column
+```
+
+Unionize the swath segments by storm ID
+
+```{r}
+Swaths2.sf <- Swaths.sf |>
+  dplyr::group_by(SID) |>
+  dplyr::summarize(Date0 = dplyr::first(Date),
+                   NAME = dplyr::first(NAME),
+                   geometry = st_union(geometry))
+```
+
+
+I need to expand the data set by adding features based on the increment value of the attribute `Date0`
+
+```{r}
+deltaT <- 1   # One day increment
+n_new <- 3    # Number of new features (rows) to create for each feature (row) times 2
+
+library(tidyr)
+
+# Expand dataset by adding incremented values
+expanded_Swaths.sf <- Swaths2.sf |>
+    dplyr::rowwise() |>
+    dplyr::mutate(new_features = list(tibble(
+                  Dates = Date0 + (-n_new:n_new) * deltaT,
+                  sid = SID
+                  ))) |>
+    unnest(new_features) |>
+    dplyr::ungroup() |>
+    dplyr::select(-Date0, -SID) # Remove original columns
+```
+
+Transform the coordinates to lat/lon
+
+```{r}
+expanded_Swaths.sf <- expanded_Swaths.sf |>
+  sf::st_transform(crs = 4326)
+```
+
+
+
+
 ```{r}
 Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
   sf::st_transform(crs = 32616)
 
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
+X <- Swaths.sf |>
   sf::st_intersection(y = Boundaries.sf) |>
   dplyr::select(geoid, name, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
   dplyr::mutate(date = lubridate::as_date(ISO_TIME)) |>
@@ -139,8 +198,7 @@ Boundaries.sf <- tidycensus::get_acs(
   ) |>
     sf::st_transform(crs = 32616)
 
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
+X <- Swaths.sf |>
   sf::st_intersection(y = Boundaries.sf) |>
   dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
   dplyr::mutate(date = lubridate::as_date(ISO_TIME),
@@ -190,8 +248,7 @@ Boundaries.sf <- get_acs(
   sf::st_transform(crs = 32616)
 
 
-X <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
+X <- Swaths.sf |>
   sf::st_intersection(y = Boundaries2.sf) |>
   dplyr::select(GEOID, NAME.1, ISO_TIME, NAME, USA_WIND, USA_PRES) |>
   dplyr::mutate(date = lubridate::as_date(ISO_TIME),
