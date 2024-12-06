@@ -1,12 +1,13 @@
 ---
-title: "Hurricane wind field model"
+title: "Hurricane threat and impact locations"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
+Create a model that can be used to outline areas with dates of hurricane threats and impacts. Model output can be collated with health outcome data at the level of individuals within the areas for those specific dates.
 
-## IBTraCS data 
+## Get and import the IBTraCS data 
 
 Geometry type LINESTRING
 
@@ -15,7 +16,7 @@ https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stew
 
 https://www.ncei.noaa.gov/sites/default/files/2021-07/IBTrACS_v04_column_documentation.pdf
 
-Wind speed in knots
+Wind speed is in units of knots (nautical mile per hour)
 ```{r}
 L <- "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r00/access/shapefile/IBTrACS.NA.list.v04r00.lines.zip"
   
@@ -31,6 +32,8 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
                          layer = "IBTrACS.NA.list.v04r00.lines") |>
   sf::st_transform(crs = 32616)
 ```
+
+## Summary statistics
 
 Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
 ```{r}
@@ -62,8 +65,9 @@ Tracks2.sf |>
                    avgROCI = mean(USA_ROCI, na.rm = TRUE) * 1.852)
 ```
 
-Fill in missing RMW values. Start with pedigree, then use minimum pressure, and finish again with pedigree
+## Fill in missing RMW values
 
+Start with pedigree, then use minimum pressure, and finish again with pedigree
 ```{r}
 Tracks2.sf <- Tracks2.sf |>
   dplyr::group_by(SID) |>  # pedigree
@@ -79,7 +83,6 @@ Tracks2.sf <- Tracks2.sf |>
 ```
 
 Add a buffer to the tracks to make segmented swaths
-
 ```{r}
 Swaths.sf <- Tracks2.sf |>
   sf::st_buffer(dist = Tracks2.sf$USA_RMW * 1852) # 1852 converts to meters
@@ -94,11 +97,9 @@ tmap::tmap_mode("view")
 
 tmap::tm_shape(Swaths.sf) +
   tmap::tm_borders()
-
 ```
 
-
-## Extract the dates of county-level TC center crossings 1980-2023
+## Florida hurricane swaths
 
 https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
 
@@ -109,8 +110,7 @@ devtools::install_github("ropensci/USAboundariesData")
 devtools::install_github("ropensci/USAboundaries")
 ```
 
-Keep only swaths that intersect the boundary of Florida
-
+Keep only swaths intersecting the boundary of Florida
 ```{r}
 Boundaries.sf <- USAboundaries::us_states(resolution = "low", states = "FL") |> 
   sf::st_transform(crs = 32616)
@@ -124,8 +124,9 @@ Swaths.sf <- Swaths.sf |>
   dplyr::mutate(Date = lubridate::as_date(ISO_TIME)) # add a m-y-d column
 ```
 
-Unionize the swath segments by storm ID
+## Extract the boundaries of storm impacts and add threat (and post-storm) dates
 
+Unionize the swath segments by storm ID
 ```{r}
 Swaths2.sf <- Swaths.sf |>
   dplyr::group_by(SID) |>
@@ -134,9 +135,7 @@ Swaths2.sf <- Swaths.sf |>
                    geometry = st_union(geometry))
 ```
 
-
-I need to expand the data set by adding features based on the increment value of the attribute `Date0`
-
+Expand the data set by adding features based on the increment value of the attribute `Date0`
 ```{r}
 deltaT <- 1   # One day increment
 n_new <- 3    # Number of new features (rows) to create for each feature (row) times 2
@@ -162,8 +161,9 @@ expanded_Swaths.sf <- expanded_Swaths.sf |>
   sf::st_transform(crs = 4326)
 ```
 
+----
 
-
+## Extract the counties affected by the storms
 
 ```{r}
 Boundaries.sf <- USAboundaries::us_counties(resolution = "low", states = "FL") |> 
