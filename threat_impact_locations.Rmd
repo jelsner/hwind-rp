@@ -167,6 +167,26 @@ expanded_Swaths.sf <- expanded_Swaths.sf |>
 
 ----
 
+## Health outcome data
+
+File received from Jihoon on December 7, 2024 via email. From email:
+
+1) Whether impacted or not when a hurricane passes on the date of death
+2) Whether impacted or not during a warning on the date of death
+3) Whether impacted or not during a watch on the date of death
+4) Whether impacted or not during an advisory on the date of death
+5) (If available) Whether impacted or not during an evacuation order on the date of death
+
+```{r}
+health.df <- read.csv(file = "data/all_deaths_hurricane.csv")
+```
+
+Time period is 1981-1-1 until 2022-12-31. Only dates are given not times. Note: Watch/warning data are only available starting in 2008
+lat/lon ranges appear to include Texas through Florida
+
+Initial thoughts: Add a column of type logical to these records that indicate whether a date from the swaths matches AND whether the location falls within the union of the swaths. First need to make this data frame a simple feature data frame with POINT geometry.
+
+
 ## Extract the counties affected by the storms
 
 ```{r}
