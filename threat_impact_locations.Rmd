@@ -39,30 +39,29 @@ Tracks.sf <- sf::st_read(dsn = here::here("data"),
 
 ## Summary statistics
 
-Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
+Average radius to maximum wind 1981-2022. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. To convert to kilometers multiply by 1.852.
 ```{r}
 Tracks.sf |>
   sf::st_drop_geometry() |>
-  dplyr::filter(year >= 1980 & year <= 2023) |>
+  dplyr::filter(year >= 1981 & year <= 2022) |>
   dplyr::summarize(avgRMW = mean(USA_RMW, na.rm = TRUE) * 1.852,
                    avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
 ```
 
-Keep only hurricanes since 1980
+Keep only hurricanes between 1981 and 2022
 ```{r}
 Tracks2.sf <- Tracks.sf |>
-  dplyr::filter(year >= 1980) |>
+  dplyr::filter(year >= 1981 & year <= 2022) |>
   dplyr::filter(USA_WIND >= 64) |>
   dplyr::select(SID, SEASON, year, month, day, hour, min,
                 NAME, SUBBASIN, ISO_TIME,
                 USA_WIND, USA_PRES, USA_RMW, USA_EYE, USA_ROCI)
 ```
 
-Average radius to maximum wind 1980-2023. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. ROCI: Radius of outer closed isobar. To convert to kilometers multiply by 1.852.
+Average radius to maximum wind 1981-2022. Values of USA_RMW (radius to maximum winds) and USA_EYE (eye diameter) are in nautical miles. ROCI: Radius of outer closed isobar. To convert to kilometers multiply by 1.852.
 ```{r}
 Tracks2.sf |>
   sf::st_drop_geometry() |>
-  dplyr::filter(year >= 1980 & year <= 2023) |>
 #  dplyr::group_by(USA_PRES) |>
   dplyr::summarize(avgRMW = mean(USA_RMW, na.rm = TRUE) * 1.852,
                    avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852,
@@ -136,10 +135,10 @@ Swaths2.sf <- Swaths.sf |>
   dplyr::group_by(SID) |>
   dplyr::summarize(Date0 = dplyr::first(Date),
                    NAME = dplyr::first(NAME),
-                   geometry = st_union(geometry))
+                   geometry = sf::st_union(geometry))
 ```
 
-Expand the data set by adding features based on the increment value of the attribute `Date0`
+Expand the data set by adding features based on the increment value of the attribute `Date0`. Earlier dates are threat days
 ```{r}
 deltaT <- 1   # One day increment
 n_new <- 3    # Number of new features (rows) to create for each feature (row) times 2
@@ -163,9 +162,10 @@ Transform the coordinates to lat/lon
 ```{r}
 expanded_Swaths.sf <- expanded_Swaths.sf |>
   sf::st_transform(crs = 4326)
-```
 
-----
+Swaths2.sf <- Swaths2.sf |>
+    sf::st_transform(crs = 4326)
+```
 
 ## Health outcome data
 
@@ -185,6 +185,117 @@ Time period is 1981-1-1 until 2022-12-31. Only dates are given not times. Note: 
 lat/lon ranges appear to include Texas through Florida
 
 Initial thoughts: Add a column of type logical to these records that indicate whether a date from the swaths matches AND whether the location falls within the union of the swaths. First need to make this data frame a simple feature data frame with POINT geometry.
+
+```{r}
+health.sf <- health.df |>
+  dplyr::mutate(Date = lubridate::as_date(DATE_OF_DEATH)) |>
+  sf::st_as_sf(coords = c("final_lon", "final_lat"),
+               crs = 4326) |>
+  dplyr::select(Date)
+```
+
+## Determine the dates in `health.sf` that correspond with the dates in `expanded_Swaths.sf`
+
+```{r}
+X <- health.sf$Date %in% expanded_Swaths.sf$Dates
+sum(X)
+```
+
+68424 death dates correspond to hurricane threat/impact dates in Florida. But not all occur within the threat/impact zone
+
+## Determine the deaths occurring within the threat/impact zones
+
+Filter out deaths not occurring on hurricane threat/impact days in Florida
+
+```{r}
+health2.sf <- health.sf[X,]
+```
+
+Filter out deaths not occurring within the threat/impact areas
+
+```{r}
+union_Swaths.sf <- Swaths2.sf |>
+  sf::st_union()
+
+X <- health2.sf |>
+  sf::st_within(union_Swaths.sf, sparse = FALSE)
+
+health2.sf <- health2.sf[X,]
+```
+
+47386 death dates corresponding to hurricane threat/impact dates and occurring within the union of all threat/impact areas
+
+For each death assign it to the appropriate date and hurricane
+```{r}
+indicator <- rep(-3:3, times = 24)
+expanded_Swaths.sf$indicator <- indicator
+
+TI <- NULL
+for(i in 1:nrow(health2.sf)){
+TI <- c(TI, expanded_Swaths.sf$indicator[expanded_Swaths.sf$Dates == health2.sf$Date[i]])
+}
+health2.sf$TI <- TI
+```
+
+
+
+I have two simple feature data frames. One contains a date column and a simple feature column of POINT geometry the other contains a date column and a simple feature column of POLYGON geometry. For the first data frame I want to add a column indicating whether the date matches a date in the second data frame AND if the corresponding POINT lies within the corresponding POLYGON.
+
+```{r}
+library(sf)
+library(dplyr)
+
+# Example POINTS sf data frame
+points_sf <- st_sf(
+    id = 1:3,
+    date = as.Date(c("2024-01-01", "2024-01-02", "2024-01-03")),
+    geometry = st_sfc(
+        st_point(c(1, 1)),
+        st_point(c(2, 2)),
+        st_point(c(3, 3))
+    )
+)
+
+# Example POLYGONS sf data frame
+polygons_sf <- st_sf(
+    id = 1:2,
+    date = as.Date(c("2024-01-01", "2024-01-02")),
+    geometry = st_sfc(
+        st_polygon(list(rbind(c(0, 0), c(2, 0), c(2, 2), c(0, 2), c(0, 0)))),
+        st_polygon(list(rbind(c(1, 1), c(3, 1), c(3, 3), c(1, 3), c(1, 1))))
+    )
+)
+
+# Perform the Spatial Join Use a combination of date matching and spatial intersection checks
+
+# Add the matching column
+points_with_matches <- points_sf %>%
+    rowwise() %>%  # Process each POINT individually
+    mutate(
+        match = any(
+            (date == polygons_sf$date) &  # Check date match
+            st_within(geometry, polygons_sf$geometry) %>% as.logical()  # Check if POINT lies in POLYGON
+        )
+    ) %>%
+    ungroup()
+
+```
+
+
+
+
+```{r}
+# Add the matching column
+points_with_matches <- health2.sf |>
+    dplyr::rowwise() |>  # Process each POINT individually
+    dplyr::mutate(match = any((Date == expanded_Swaths.sf$Dates[1]) &  # Check date match
+            sf::st_within(geometry, expanded_Swaths.sf$geometry[1]) |>
+              as.logical()  # Check if POINT lies in POLYGON
+        )
+    ) |>
+    dplyr::ungroup()
+```
+
 
 
 ## Extract the counties affected by the storms
