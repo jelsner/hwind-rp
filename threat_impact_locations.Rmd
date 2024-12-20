@@ -5,11 +5,13 @@ editor_options:
   chunk_output_type: console
 ---
 
-Create a model that can be used to outline areas with dates of hurricane threats and impacts. Model output can be collated with health outcome data at the level of individuals within the areas for those specific dates.
+Task: Create a model that outlines areas of hurricane threats and impacts by date. Model output will be collated with health outcome data at the individual level within the areas for those dates.
 
 ## The forecast cone of uncertainty as threat/impact location model
 
 Data source: https://www.nhc.noaa.gov/gis/ Cones as KML files start in 2012
+
+## Create a model from the tracks data
 
 ## Get and import the IBTraCS data 
 
@@ -48,7 +50,7 @@ Tracks.sf |>
                    avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
 ```
 
-Keep only hurricanes between 1981 and 2022
+Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
 ```{r}
 Tracks2.sf <- Tracks.sf |>
   dplyr::filter(year >= 1981 & year <= 2022) |>
@@ -85,7 +87,8 @@ Tracks2.sf <- Tracks2.sf |>
   dplyr::mutate(USA_RMW = ifelse(is.na(USA_RMW), mean(USA_RMW, na.rm = TRUE), USA_RMW))
 ```
 
-Add a buffer to the tracks to make segmented swaths
+## Add a buffer to the tracks to make segmented swaths
+
 ```{r}
 Swaths.sf <- Tracks2.sf |>
   sf::st_buffer(dist = Tracks2.sf$USA_RMW * 1852) # 1852 converts to meters
@@ -127,7 +130,7 @@ Swaths.sf <- Swaths.sf |>
   dplyr::mutate(Date = lubridate::as_date(ISO_TIME)) # add a m-y-d column
 ```
 
-## Extract the boundaries of storm impacts and add threat (and post-storm) dates
+## Extract the boundaries of storm impacts and add threat and post-storm dates
 
 Unionize the swath segments by storm ID
 ```{r}
@@ -182,6 +185,7 @@ health.df <- read.csv(file = "data/all_deaths_hurricane.csv")
 ```
 
 Time period is 1981-1-1 until 2022-12-31. Only dates are given not times. Note: Watch/warning data are only available starting in 2008
+
 lat/lon ranges appear to include Texas through Florida
 
 Initial thoughts: Add a column of type logical to these records that indicate whether a date from the swaths matches AND whether the location falls within the union of the swaths. First need to make this data frame a simple feature data frame with POINT geometry.
@@ -223,9 +227,10 @@ X <- health2.sf |>
 health2.sf <- health2.sf[X,]
 ```
 
-47386 death dates corresponding to hurricane threat/impact dates and occurring within the union of all threat/impact areas
+47386 death dates corresponding to hurricane threat/impact dates and occurring within the threat/impact areas
 
 For each death assign it to the appropriate date and hurricane
+
 ```{r}
 indicator <- rep(-3:3, times = 24)
 expanded_Swaths.sf$indicator <- indicator
