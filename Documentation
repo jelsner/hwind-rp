@@ -4,16 +4,16 @@ Task 1: Create a model that outlines areas of hurricane threats and impacts by d
 2. Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
 3. Compute summary statistics: Average radius to fastest wind (RMW) 43.8 km, average eye diameter 34.5 km, and average radius to outer closed isobar 410 km
 4. Fill in missing RMW values. Start with pedigree, then use minimum pressure, then pedigree again
-5. Add a buffer to the tracks based on the RMW to make segmented swaths
+5. Add a distance buffer to the tracks using the RMW as the distance to make segmented swaths
 6. Keep only seqmented swaths that intersect Florida
 7. Extract the boundaries of storm impacts and add threat and post-storm dates. Unionize the swath segments by storm ID and expand the data set by adding features based on the increment value of the attribute `Date0`. Earlier dates are threat days
-8. Transform the spatial coordinates of the polygons to lat/lon. Call this the hurricane threat and impacts data (HTID)
+8. Transform the spatial coordinates of the polygons to lat/lon. Call this the modeled hurricane threat and impacts data (HTID)
 
-Task 2: Merge the hurricane threat/impact data with the health outcome data. Start with deaths.
+Task 2: Merge the modeled hurricane threat/impact data with the health outcome data. Start with deaths.
 
-1. Data file received from Jihoon on December 7, 2024 via email. 
-2. Import the health outcome data (HOD). Time period is 1981-1-1 until 2022-12-31.
-3. Make the data frame a point geometry data frame with lat/lon as geographic coordinates
-4. Determine the dates in the HOD that correspond to the dates in HTID
-5. Determine the deaths occurring within the threat/impact zones. Filter out deaths not occurring on hurricane threat/impact days in Florida. Filter out deaths not occurring within the threat/impact areas
+1. Data file received as a csv file from Jihoon on December 7, 2024 via email. 
+2. Import the health outcome data (HOD). Time period is 1981-1-1 through 2022-12-31.
+3. Make the data a point geometry data frame with lat/lon as geographic coordinates
+4. Determine dates in the HOD that correspond to dates in the modeled HTID
+5. Determine the deaths occurring within the threat/impact polygons. Filter deaths not occurring on hurricane threat/impact days in Florida. Filter deaths not occurring within the threat/impact polygons
 6. For each death assign it to the appropriate date and hurricane
