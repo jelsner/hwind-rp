@@ -1,4 +1,4 @@
-Task 1: Create a model that outlines areas of hurricane threats and impacts by date. Model output will be collated with health outcome data at the individual level within the areas for those dates.
+Task 1: Create a model that outlines areas of hurricane threats and impacts by date. Model output data will be merged with health outcome data at the individual level
 
 1. Get and import the IBTraCS data
 2. Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
@@ -16,4 +16,4 @@ Task 2: Merge the modeled hurricane threat/impact data with the health outcome d
 3. Make the data a point geometry data frame with lat/lon as geographic coordinates
 4. Determine dates in the HOD that correspond to dates in the modeled HTID
 5. Determine the deaths occurring within the threat/impact polygons. Filter deaths not occurring on hurricane threat/impact days in Florida. Filter deaths not occurring within the threat/impact polygons
-6. For each death assign it to the appropriate date and hurricane
+6. For each remaining death date assign it to the appropriate hurricane threat or impact
