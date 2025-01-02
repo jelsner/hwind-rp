@@ -264,7 +264,7 @@ HO2.df <- HO2.sf |>
 Output.df <- HO2.df |>
   dplyr::select(Death_ID, Death_Date, final_lat, final_lon, Hurricane, TIC)
 
-write.csv(Output.df, file = "data/hurDeaths.csv")
+write.csv(Output.df, file = "hurDeaths.csv")
 ```
 
 
