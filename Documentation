@@ -1,4 +1,4 @@
-Task 1: Create a model that outlines areas of hurricane threats and impacts by date. Model output data will be merged with health outcome data at the individual level
+Task 1: Create a model that outlines areas of hurricane threat, impact, and cleanup by date. Modeled data will be merged with health outcome data at the individual level
 
 1. Get and import the IBTraCS data
 2. Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
@@ -6,14 +6,14 @@ Task 1: Create a model that outlines areas of hurricane threats and impacts by d
 4. Fill in missing RMW values. Start with pedigree, then use minimum pressure, then pedigree again
 5. Add a distance buffer to the tracks using the RMW as the distance to make segmented swaths
 6. Keep only seqmented swaths that intersect Florida
-7. Extract the boundaries of storm impacts and add threat and post-storm dates. Unionize the swath segments by storm ID and expand the data set by adding features based on the increment value of the attribute `Date0`. Earlier dates are threat days
-8. Transform the spatial coordinates of the polygons to lat/lon. Call this the modeled hurricane threat and impacts data (HTID)
+7. Extract the boundaries of storm impacts and add threat and cleanup dates. Unionize the swath segments by storm ID and expand the data set by adding features based on the increment value of the attribute `Date0`. Earlier dates are threat days
+8. Transform the spatial coordinates of the polygons to lat/lon. Call this the modeled hurricane threat, impact, and cleanup (TIC) data
 
-Task 2: Merge the modeled hurricane threat/impact data with the health outcome data. Start with deaths.
+Task 2: Merge the modeled hurricane TIC data with the health outcome (HO) data at the level of individuals. Start with deaths
 
-1. Data file received as a csv file from Jihoon on December 7, 2024 via email. 
-2. Import the health outcome data (HOD). Time period is 1981-1-1 through 2022-12-31.
-3. Make the data a point geometry data frame with lat/lon as geographic coordinates
-4. Determine dates in the HOD that correspond to dates in the modeled HTID
-5. Determine the deaths occurring within the threat/impact polygons. Filter deaths not occurring on hurricane threat/impact days in Florida. Filter deaths not occurring within the threat/impact polygons
-6. For each remaining death date assign it to the appropriate hurricane threat or impact
+1. Data file received as a csv file from Jihoon on December 7, 2024 via email
+2. Import the health outcome (HO) data. Time period is 1981-1-1 through 2022-12-31.  ~6.2 million deaths (date/location-lat/lon)
+3. Make the spreadsheet a point geometry data frame with lat/lon as geographic coordinates
+4. Determine dates in the HO data that correspond to dates in the TIC data
+5. Determine the deaths occurring within the threat/impact/cleanup polygons. Remove deaths not occurring on threat/impact/cleanup days in Florida. Remove deaths not occurring within the threat/impact/cleanup polygons
+6. For each remaining death date assign it to the appropriate threat, impact, cleanup (0: impact, negative integers indicate time before impact, positive integers indicate time after impact)

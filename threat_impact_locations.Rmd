@@ -160,7 +160,7 @@ expanded_Swaths.sf <- Swaths2.sf |>
     dplyr::select(-Date0, -SID) # Remove original columns
 ```
 
-Transform the coordinates to lat/lon
+Transform the coordinates to lat/lon. Relabel as TIC.sf
 
 ```{r}
 expanded_Swaths.sf <- expanded_Swaths.sf |>
@@ -168,6 +168,8 @@ expanded_Swaths.sf <- expanded_Swaths.sf |>
 
 Swaths2.sf <- Swaths2.sf |>
     sf::st_transform(crs = 4326)
+
+TIC.sf <- expanded_Swaths.sf
 ```
 
 ## Health outcome data
@@ -175,14 +177,17 @@ Swaths2.sf <- Swaths2.sf |>
 File received from Jihoon on December 7, 2024 via email. From email:
 
 1) Whether impacted or not when a hurricane passes on the date of death
+? What was impacted?
 2) Whether impacted or not during a warning on the date of death
 3) Whether impacted or not during a watch on the date of death
 4) Whether impacted or not during an advisory on the date of death
 5) (If available) Whether impacted or not during an evacuation order on the date of death
 
 ```{r}
-health.df <- read.csv(file = "data/all_deaths_hurricane.csv")
+HO.df <- read.csv(file = "data/all_deaths_hurricane.csv")
 ```
+
+6.2 million deaths
 
 Time period is 1981-1-1 until 2022-12-31. Only dates are given not times. Note: Watch/warning data are only available starting in 2008
 
@@ -191,58 +196,79 @@ lat/lon ranges appear to include Texas through Florida
 Initial thoughts: Add a column of type logical to these records that indicate whether a date from the swaths matches AND whether the location falls within the union of the swaths. First need to make this data frame a simple feature data frame with POINT geometry.
 
 ```{r}
-health.sf <- health.df |>
+HO.sf <- HO.df |>
   dplyr::mutate(Date = lubridate::as_date(DATE_OF_DEATH)) |>
   sf::st_as_sf(coords = c("final_lon", "final_lat"),
                crs = 4326) |>
-  dplyr::select(Date)
+  dplyr::select(Death_ID = ID, Death_Date = Date)
 ```
 
-## Determine the dates in `health.sf` that correspond with the dates in `expanded_Swaths.sf`
+## Determine the dates in `HO.sf` that correspond with the dates in `TIC.sf`
 
 ```{r}
-X <- health.sf$Date %in% expanded_Swaths.sf$Dates
+X <- HO.sf$Death_Date %in% TIC.sf$Dates
 sum(X)
 ```
 
-68424 death dates correspond to hurricane threat/impact dates in Florida. But not all occur within the threat/impact zone
+68424 death dates correspond to hurricane threat/impact/cleanup dates in Florida. But not all occur within the threat/impact zone
 
-## Determine the deaths occurring within the threat/impact zones
+## Determine the deaths occurring within the threat/impact/cleanup zones
 
-Filter out deaths not occurring on hurricane threat/impact days in Florida
-
+Filter out deaths not occurring on hurricane threat/impact/cleanup days in Florida
 ```{r}
-health2.sf <- health.sf[X,]
+HO2.sf <- HO.sf[X,]
 ```
 
-Filter out deaths not occurring within the threat/impact areas
-
+Filter out deaths not occurring within the threat/impact/cleanup areas
 ```{r}
 union_Swaths.sf <- Swaths2.sf |>
   sf::st_union()
 
-X <- health2.sf |>
+X <- HO2.sf |>
   sf::st_within(union_Swaths.sf, sparse = FALSE)
 
-health2.sf <- health2.sf[X,]
+HO2.sf <- HO2.sf[X,]
 ```
 
-47386 death dates corresponding to hurricane threat/impact dates and occurring within the threat/impact areas
+47386 death dates corresponding to TIC dates and occurring within the impact areas
 
-For each death assign it to the appropriate date and hurricane
-
+For each death assign the outcome to the appropriate date and hurricane
 ```{r}
 indicator <- rep(-3:3, times = 24)
-expanded_Swaths.sf$indicator <- indicator
+TIC.sf$indicator <- indicator
 
-TI <- NULL
-for(i in 1:nrow(health2.sf)){
-TI <- c(TI, expanded_Swaths.sf$indicator[expanded_Swaths.sf$Dates == health2.sf$Date[i]])
+TIC <- NULL
+Hurricane <- NULL
+for(i in 1:nrow(HO2.sf)){
+TIC <- c(TIC, TIC.sf$indicator[TIC.sf$Dates == HO2.sf$Death_Date[i]])
+Hurricane <- c(Hurricane, TIC.sf$NAME[TIC.sf$Dates == HO2.sf$Death_Date[i]])
 }
-health2.sf$TI <- TI
+HO2.sf$TIC <- TIC
+HO2.sf$Hurricane <- Hurricane
+```
+
+The row names of HO2.sf corresponding to the row numbers in the original CSV file
+
+Convert the simple feature data frame to a regular data frame and write to a CSV file
+
+```{r}
+coords <- sf::st_coordinates(HO2.sf)
+
+# Combine attributes with coordinates
+HO2.df <- HO2.sf |>
+    sf::st_drop_geometry() |>  # Drop the geometry column
+    cbind(coords) |>           # Add the coordinates as columns
+    dplyr::rename(final_lat = Y, final_lon = X)
+
+
+Output.df <- HO2.df |>
+  dplyr::select(Death_ID, Death_Date, final_lat, final_lon, Hurricane, TIC)
+
+write.csv(Output.df, file = "data/hurDeaths.csv")
 ```
 
 
+# Scratch
 
 I have two simple feature data frames. One contains a date column and a simple feature column of POINT geometry the other contains a date column and a simple feature column of POLYGON geometry. For the first data frame I want to add a column indicating whether the date matches a date in the second data frame AND if the corresponding POINT lies within the corresponding POLYGON.
 
