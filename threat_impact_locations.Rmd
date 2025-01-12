@@ -54,7 +54,7 @@ Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
 ```{r}
 Tracks2.sf <- Tracks.sf |>
   dplyr::filter(year >= 1981 & year <= 2022) |>
-  dplyr::filter(USA_WIND >= 34) |> # changed from 64 for hurricanes
+  dplyr::filter(USA_WIND >= 64) |> # change to 34 for tropical storms and hurricanes
   dplyr::select(SID, SEASON, year, month, day, hour, min,
                 NAME, SUBBASIN, ISO_TIME,
                 USA_WIND, USA_PRES, USA_RMW, USA_EYE, USA_ROCI)
@@ -172,7 +172,7 @@ Swaths2.sf <- Swaths2.sf |>
 TIC.sf <- expanded_Swaths.sf
 ```
 
-## Health outcome data
+## Merge with health outcome data
 
 File received from Jihoon on December 7, 2024 via email. From email:
 
@@ -203,7 +203,7 @@ HO.sf <- HO.df |>
   dplyr::select(Death_ID = ID, Death_Date = Date)
 ```
 
-## Determine the dates in `HO.sf` that correspond with the dates in `TIC.sf`
+Determine the dates in `HO.sf` that correspond with the dates in `TIC.sf`
 
 ```{r}
 X <- HO.sf$Death_Date %in% TIC.sf$Dates
@@ -217,7 +217,7 @@ sum(Y)
 
 6097671 death dates correspond to dates outside TIC dates in Florida.
 
-## Determine the deaths occurring within the threat/impact/cleanup zones
+Determine the deaths occurring within the threat/impact/cleanup zones
 
 Keep only deaths occurring during hurricane threat/impact/cleanup days in Florida
 ```{r}
@@ -258,8 +258,31 @@ length(unique(HO3.sf$Death_Date))
 47836/168 = 282 deaths per day
 4184405/15172 = 276 deaths per day
 
-Approximately 6 extra deaths per day due to threat/impact/cleanup. What is the uncertainty on this estimate? One way to answer this is to choose random dates. `Date0` in `Swaths.sf` 
+Approximately 6 extra deaths per day due to threat/impact/cleanup. What is the statistical significance of this difference? One way to answer this is to choose random dates and repeat to get a new difference. `Date0` in `Swaths.sf`
 
+## Statistical significance of this difference
+
+Define the range of dates
+```{r}
+start_date <- as.Date("1981-01-01")
+end_date <- as.Date("2025-12-31")
+```
+
+# Generate a sequence of all possible dates in the range
+# Remove dates not occurring during the hurricane season June-November
+all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+
+# Randomly sample 10 dates from the range
+set.seed(123)  # For reproducibility
+random_dates <- sample(all_dates, size = 10, replace = FALSE)
+
+# Display the random dates
+print(random_dates)
+
+
+
+
+## Write out the results to a file
 
 For each death assign the outcome to the appropriate date and hurricane
 ```{r}
@@ -296,9 +319,11 @@ Output.df <- HO2.df |>
 write.csv(Output.df, file = "hurDeaths.csv")
 ```
 
+## Death rates per 100,000 people
+
 To extract the population for an area in the United States defined by a polygon, you can use geospatial data and census data
 
-1. Install and load required packages
+Install and load required packages
 
 ```{r}
 install.packages(c("sf", "tidycensus", "tigris", "dplyr"))
@@ -309,7 +334,7 @@ library(tigris)
 library(dplyr)
 ```
 
-2. Set up the Census API
+Set up the Census API
 
 Register for a [Census API key](https://api.census.gov/data/key_signup.html), and load it into your R session:
 
@@ -317,7 +342,7 @@ Register for a [Census API key](https://api.census.gov/data/key_signup.html), an
 census_api_key("API KEY", install = TRUE)  # already exits
 ```
 
-3. Obtain the polygon for your area
+Obtain the polygon for your area
 
 Load your polygon (e.g., a shapefile or GeoJSON file)
 
@@ -331,7 +356,7 @@ Ensure the polygon is in the same coordinate reference system (CRS) as the censu
 polygon <- sf::st_transform(polygon, crs = 4326)  # Use WGS84 (EPSG:4326)
 ```
 
-4. Retrieve census data
+Retrieve census data
 
 Use the `tidycensus` package to retrieve population data for the relevant census geography, such as tracts or block groups
 
@@ -344,7 +369,7 @@ state_data <- get_decennial(
 )
 ```
 
-5. Filter census data by the polygon
+Filter census data by the polygon
 
 Perform a spatial join to filter census tracts or block groups that intersect your polygon
 
@@ -356,7 +381,7 @@ state_data <- st_transform(state_data, crs = st_crs(polygon))
 intersected_data <- st_intersection(state_data, polygon)
 ```
 
-6. Aggregate the population
+Aggregate the population
 
 Sum the population for the intersected areas
 
@@ -370,17 +395,19 @@ print(total_population)
 
 15.9 million people out of approximately 23 million
 
-### Notes
+Notes
 **Accuracy**: Population data is often tied to census geographies (e.g., tracts, block groups, or blocks). This means populations are aggregated, and exact numbers within custom polygons may require interpolation or more granular data.
 **Adjust for Partial Intersections**: If your polygon only partially overlaps some census geographies, you might need to apportion populations based on the area of overlap using `st_area()` or similar functions
 
-47,386 deaths occurring in these regions occurring over 168 days (7 days x 24 hurricanes)
+47,386 deaths occurred within the impacted areas on the 168 TIC days  (7 days x 24 hurricanes)
 47386/15947828 = .002971
-
 .002971/168 = .00001768 deaths/day or 1.768 deaths per 100,000 people per day
 
-The annual death rate in Florida is 830 per 100,000 or 830/365 = 2.274 deaths per 100,000 people per day
+4,184,405 deaths occurred within the impacted areas on the 15172 non TIC days
+4184405/15947828 = .2623809
+.2623809/15172 = .00001729 deaths/day or 1.729 deaths per 100,000 people per day
 
+The annual death rate in Florida is 830 per 100,000 or 830/365 = 2.274 deaths per 100,000 people per day
 
 ## Watch/warning areas
 
