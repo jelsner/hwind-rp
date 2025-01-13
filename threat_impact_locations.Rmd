@@ -258,29 +258,39 @@ length(unique(HO3.sf$Death_Date))
 47836/168 = 282 deaths per day
 4184405/15172 = 276 deaths per day
 
-Approximately 6 extra deaths per day due to threat/impact/cleanup. What is the statistical significance of this difference? One way to answer this is to choose random dates and repeat to get a new difference. `Date0` in `Swaths.sf`
+Approximately 6 extra deaths per day during threat/impact/cleanup. What is the statistical significance of this difference? One way to answer this is to choose random dates and repeat to get a new difference
 
 ## Statistical significance of this difference
 
-Define the range of dates
+Define the range of dates. Generate a sequence of all dates in the range commensurate with the range of death dates. Remove dates not occurring during the hurricane season (June - November)
 ```{r}
 start_date <- as.Date("1981-01-01")
-end_date <- as.Date("2025-12-31")
+end_date <- as.Date("2022-12-31")
+
+all_dates <- seq.Date(from = start_date,
+                      to = end_date,
+                      by = "day")
+months <- lubridate::month(all_dates)
+hur_months <- months %in% seq(6, 11)
+all_dates <- all_dates[hur_months]
 ```
 
-# Generate a sequence of all possible dates in the range
-# Remove dates not occurring during the hurricane season June-November
-all_dates <- seq.Date(from = start_date, to = end_date, by = "day")
+```{r}
+for(k in 1:1){
+set.seed(8967)  # for reproducibility
+random_dates <- sample(all_dates, size = 24, replace = FALSE) # size is the number of hurricanes
+expanded_random_dates <- do.call(c, lapply(random_dates, function(date) seq(date - n_new, date + n_new, by = "day")))
+expanded_random_dates <- sort(expanded_random_dates)
 
-# Randomly sample 10 dates from the range
-set.seed(123)  # For reproducibility
-random_dates <- sample(all_dates, size = 10, replace = FALSE)
+X <- HO.sf$Death_Date %in% expanded_random_dates
+#print(sum(X))
+Y <- !HO.sf$Death_Date %in% expanded_random_dates
+#print(sum(Y))
 
-# Display the random dates
-print(random_dates)
-
-
-
+HO2.sf <- HO.sf[X,]
+HO3.sf <- HO.sf[Y,]
+}
+```
 
 ## Write out the results to a file
 
