@@ -50,7 +50,7 @@ Tracks.sf |>
                    avgEYE = mean(USA_EYE, na.rm = TRUE) * 1.852)
 ```
 
-Keep only hurricanes (USA_WIND >= 64) between 1981 and 2022
+Keep only cyclones (USA_WIND >= 64) between 1981 and 2022
 ```{r}
 Tracks2.sf <- Tracks.sf |>
   dplyr::filter(year >= 1981 & year <= 2022) |>
@@ -96,13 +96,6 @@ Swaths.sf <- Tracks2.sf |>
 SingleSwaths.sf <- Swaths.sf |>
   dplyr::group_by(SID) |>
   sf::st_combine()
-
-library(tmap)
-
-tmap::tmap_mode("view")
-
-tmap::tm_shape(Swaths.sf) +
-  tmap::tm_borders()
 ```
 
 ## Florida hurricane swaths
@@ -128,6 +121,13 @@ Swaths.sf <- Swaths.sf[X, ]
 
 Swaths.sf <- Swaths.sf |>
   dplyr::mutate(Date = lubridate::as_date(ISO_TIME)) # add a m-y-d column
+
+library(tmap)
+
+tmap::tmap_mode("view")
+
+tmap::tm_shape(Swaths.sf$geometry) +
+  tmap::tm_borders()
 ```
 
 ## Extract the boundaries of storm impacts and add threat and post-storm dates
@@ -139,6 +139,9 @@ Swaths2.sf <- Swaths.sf |>
   dplyr::summarize(Date0 = dplyr::first(Date),
                    NAME = dplyr::first(NAME),
                    geometry = sf::st_union(geometry))
+
+tmap::tm_shape(Swaths2.sf$geometry) +
+  tmap::tm_borders()
 ```
 
 Expand the data set by adding features based on the increment value of the attribute `Date0`. Earlier dates are threat days
@@ -172,7 +175,7 @@ Swaths2.sf <- Swaths2.sf |>
 TIC.sf <- expanded_Swaths.sf
 ```
 
-## Merge with health outcome data
+## Merge with health outcome data (deaths)
 
 File received from Jihoon on December 7, 2024 via email. From email:
 
@@ -208,14 +211,15 @@ Determine the dates in `HO.sf` that correspond with the dates in `TIC.sf`
 ```{r}
 X <- HO.sf$Death_Date %in% TIC.sf$Dates
 sum(X)
-
 Y <- !HO.sf$Death_Date %in% TIC.sf$Dates
 sum(Y)
 ```
 
 68424 death dates correspond to hurricane threat/impact/cleanup dates in Florida. But not all occur within the threat/impact zone
+233211 death dates correspond to TS/hurricane threat/impact/cleanup dates in Florida. But not all occur within the threat/impact zone
 
-6097671 death dates correspond to dates outside TIC dates in Florida.
+6097671 death dates correspond to dates outside hurricane TIC dates in Florida
+5932884 death dates correspond to dates outside TS/hurricane TIC dates in Florida
 
 Determine the deaths occurring within the threat/impact/cleanup zones
 
@@ -255,10 +259,16 @@ length(unique(HO3.sf$Death_Date))
 47386 deaths occurred within the impacted areas on the 168 TIC days
 4184405 deaths occurred within the impacted areas on the 15172 non TIC days
 
-47836/168 = 282 deaths per day
+47836/168 = 285 deaths per day
 4184405/15172 = 276 deaths per day
 
-Approximately 6 extra deaths per day during threat/impact/cleanup. What is the statistical significance of this difference? One way to answer this is to choose random dates and repeat to get a new difference
+233204 deaths occurred within the impacted areas on 566 TIC days
+5932456 deaths occurred within the impacted areas on the 14774 non TIC days
+
+233204/566 = 412
+5932456/14774 = 402
+
+Approximately 9 (hur only) and 10 (TS & hur) extra deaths per day during threat/impact/cleanup (7 days). What is the statistical significance of this difference? One way to answer this is to choose random dates and repeat to get a new difference
 
 ## Statistical significance of this difference
 
@@ -276,20 +286,38 @@ all_dates <- all_dates[hur_months]
 ```
 
 ```{r}
-for(k in 1:1){
-set.seed(8967)  # for reproducibility
-random_dates <- sample(all_dates, size = 24, replace = FALSE) # size is the number of hurricanes
+begin_Time <- Sys.time()
+#excess_Deaths <- NULL
+#set.seed(896912)  # for reproducibility
+for(k in 1:70){
+random_dates <- sample(all_dates, size = 24, replace = FALSE) # size here is the number of cyclones
 expanded_random_dates <- do.call(c, lapply(random_dates, function(date) seq(date - n_new, date + n_new, by = "day")))
 expanded_random_dates <- sort(expanded_random_dates)
 
 X <- HO.sf$Death_Date %in% expanded_random_dates
-#print(sum(X))
 Y <- !HO.sf$Death_Date %in% expanded_random_dates
-#print(sum(Y))
 
 HO2.sf <- HO.sf[X,]
 HO3.sf <- HO.sf[Y,]
+
+X <- HO2.sf |>
+  sf::st_within(union_Swaths.sf, sparse = FALSE)
+HO2.sf <- HO2.sf[X,]
+Y <- HO3.sf |>
+  sf::st_within(union_Swaths.sf, sparse = FALSE)
+HO3.sf <- HO3.sf[Y,]
+
+nrow(HO2.sf) / length(unique(HO2.sf$Death_Date))
+nrow(HO3.sf) / length(unique(HO3.sf$Death_Date))
+
+difference <- nrow(HO2.sf) / length(unique(HO2.sf$Death_Date)) -
+                  nrow(HO3.sf) / length(unique(HO3.sf$Death_Date))
+print(difference)
+
+excess_Deaths <- c(difference, excess_Deaths)
 }
+
+Sys.time() - begin_Time
 ```
 
 ## Write out the results to a file
@@ -427,7 +455,55 @@ WW.df <- readr::read_csv("data/filtered_hurricane_data_FL.csv")
 
 WW.sf <- sf::st_read(dsn = here::here("data"), 
                      layer = "z_05mr24")
+```
 
+## Merge with health outcome data (births)
+
+Email from Jihoon on December 11, 2024
+
+1. ID 
+2. DATE_OF_BIRTH 
+3. final_lat  
+4. final_lon 
+5. trimester1_s_date: The first Trimester start date
+6. trimester1_e_date : The first Trimester end date
+7. trimester2_s_date : The second Trimester start date
+8. trimester2_e_date : The second Trimester end date
+9. trimester3_s_date: The third Trimester start date
+# The first Trimester: the weeks 1-13 
+# The second Trimester: the weeks 14-28
+# The third Trimester: the weeks 29 ~
+
+```{r}
+Births.df <- read.csv(file = "data/all_births_hurricane.csv")
+```
+
+7.2 million births. Time period is 1981-1-1 until 2022-12-31. Only dates are given not times. lat/lon ranges appear to include Texas through Florida
+
+Make the data frame a simple feature data frame with POINT geometry
+
+```{r}
+
+Births.sf <- Births.df |>
+  dplyr::mutate(Date = lubridate::as_date(DATE_OF_BIRTH),
+                DateT1s = lubridate::as_date(trimester1_s_date),
+                DateT1e = lubridate::as_date(trimester1_e_date),
+                DateT2s = lubridate::as_date(trimester2_s_date),
+                DateT2e = lubridate::as_date(trimester2_e_date),
+                DateT3s = lubridate::as_date(trimester3_s_date)
+                ) |>
+  sf::st_as_sf(coords = c("final_lon", "final_lat"),
+               crs = 4326) |>
+  dplyr::select(Birth_ID = ID, Birth_Date = Date, DateT1s, DateT1e, DateT2s, DateT2e, DateT3s)
+```
+
+Determine whether there was a hurricane during each of the trimesters
+
+```{r}
+X <- HO.sf$Death_Date %in% TIC.sf$Dates
+sum(X)
+Y <- !HO.sf$Death_Date %in% TIC.sf$Dates
+sum(Y)
 ```
 
 
