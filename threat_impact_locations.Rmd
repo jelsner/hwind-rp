@@ -497,13 +497,56 @@ Births.sf <- Births.df |>
   dplyr::select(Birth_ID = ID, Birth_Date = Date, DateT1s, DateT1e, DateT2s, DateT2e, DateT3s)
 ```
 
-Determine whether there was a hurricane during each of the trimesters
+Keep only births occurring inside the TIC polygons
 
 ```{r}
-X <- HO.sf$Death_Date %in% TIC.sf$Dates
-sum(X)
-Y <- !HO.sf$Death_Date %in% TIC.sf$Dates
-sum(Y)
+Swaths2.sf <- Swaths2.sf |>
+    sf::st_transform(crs = 4326)
+union_Swaths.sfg <- Swaths2.sf |>
+  sf::st_union()
+withIn <- Births.sf |>
+  sf::st_within(union_Swaths.sfg, sparse = FALSE)
+BirthsWithin.sf <- Births.sf[withIn,]
+```
+
+Determine whether there was a hurricane during each of the trimesters. Start with one of the trimesters
+
+Example birth data
+```{r}
+births <- data.frame(
+  birth_date = as.Date(c("2023-06-01", "2023-07-15", "2023-08-10")),
+  trimester_start = as.Date(c("2022-09-01", "2022-10-01", "2022-11-01")),
+  trimester_end = as.Date(c("2022-12-01", "2022-12-31", "2023-02-01"))
+)
+```
+
+Example hurricane impact data
+```{r}
+hurricanes <- data.frame(
+  hurricane_date = as.Date(c("2022-09-03", "2022-10-10", "2023-01-15", "2023-02-28")),
+  hurricane_name = c("Hurricane A", "Hurricane B", "Hurricane C", "Hurricane D"),
+  TIC = c("Threat", "Threat", "Impact", "Cleanup")
+)
+```
+
+Perform a join to match hurricanes within the first trimester range
+```{r}
+#library(dplyr)
+
+# Check if each hurricane falls within the first trimester for each birth
+results <- births |>
+  rowwise() |>
+  mutate(
+    matches = list(
+      hurricanes |>
+        filter(hurricane_date >= trimester_start & hurricane_date <= trimester_end)
+    )
+  ) |>
+  unnest(matches, keep_empty = TRUE) |>
+  select(birth_date, trimester_start, trimester_end, hurricane_date, hurricane_name, TIC)
+
+
+print(results)
 ```
 
 
